@@ -122,7 +122,7 @@ DATABASES = {
         'USER': config("USER"),            # from "User"
         'PASSWORD': config("PASSWORD"),        # from "Password"
         'HOST': config("HOST"),                # from "Host"
-        'PORT': config("PORT"),                # from "Port"
+        'PORT': config("PPORT"),                # from "Port"
         'OPTIONS': {
             'sslmode': 'require',             # from "SSL mode" (usually 'require')
             'sslrootcert': 'ca.pem'  # path to downloaded CA certificate
