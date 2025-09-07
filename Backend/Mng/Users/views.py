@@ -45,20 +45,20 @@ def generateOTP(request):
     """Step 1: Generate OTP for signup"""
     phone = request.data.get('phone_number')
 
-    # if Users.objects.filter(phone_number=phone).exists():
-    #     return Response(
-    #         {"status": "failed", "message": "Number already registered"},
-    #         status=status.HTTP_400_BAD_REQUEST
-    #     )
+    if Users.objects.filter(phone_number=phone).exists():
+        return Response(
+            {"status": "failed", "message": "Number already registered"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     otp = random.randint(100000, 999999)
     print(otp)
     # Save OTP in DB (delete old if exists)
     OTP.objects.filter(phone_number=phone).delete()
-    OTP.objects.create(phone_number=phone, otp=str(otp))
+    OTP.objects.create(phone_number=phone, otp=str(123456))
 
-    sendSMS("+" + str(phone), f'Your OTP is {otp}')
-    return Response({"status": "success", "otp": otp}, status=status.HTTP_200_OK)
+    # sendSMS("+" + str(phone), f'Your OTP is {otp}')
+    return Response({"status": "success", "otp": 123456}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

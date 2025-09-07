@@ -46,8 +46,8 @@ from decouple import config
 
 def sendSMS(phone, message):
 
-    account_sid = config("ACCOUNT_SID", default="unsafe-secret-key")
-    auth_token = config("ACCOUNT_TOKEN", default="unsafe-secret-key")
+    account_sid = config("ACCOUNT_SID")
+    auth_token = config("AUTH_TOKEN")
     client = Client(account_sid ,auth_token)
     
     Message = client.messages.create(
