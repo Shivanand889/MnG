@@ -45,11 +45,11 @@ def generateOTP(request):
     """Step 1: Generate OTP for signup"""
     phone = request.data.get('phone_number')
 
-    if Users.objects.filter(phone_number=phone).exists():
-        return Response(
-            {"status": "failed", "message": "Number already registered"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    # if Users.objects.filter(phone_number=phone).exists():
+    #     return Response(
+    #         {"status": "failed", "message": "Number already registered"},
+    #         status=status.HTTP_400_BAD_REQUEST
+    #     )
 
     otp = random.randint(100000, 999999)
     print(otp)
