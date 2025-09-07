@@ -57,7 +57,7 @@ def generateOTP(request):
     OTP.objects.filter(phone_number=phone).delete()
     OTP.objects.create(phone_number=phone, otp=str(otp))
 
-    # sendSMS("+" + str(phone), f'Your OTP is {otp}')
+    sendSMS("+" + str(phone), f'Your OTP is {otp}')
     return Response({"status": "success", "otp": otp}, status=status.HTTP_200_OK)
 
 

@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mng_ui">
 
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- ✅ Explicitly set minSdk and targetSdk -->
     <uses-sdk
         android:minSdkVersion="18"
