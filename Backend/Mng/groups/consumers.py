@@ -1,22 +1,12 @@
-# groups/consumers.py - Fixed version
+# groups/consumers.py - Final Fixed Version
 
 import json
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import AnonymousUser
 
 from Users.models import Users
 from .models import Group, GroupMember, GroupMessage
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
-
-def get_user_from_token(token):
-    print("🔑 Validating token...")
-    jwt_auth = JWTAuthentication()
-    validated_token = jwt_auth.get_validated_token(token)
-    user = jwt_auth.get_user(validated_token)
-    print(f"✅ Token valid for user: {user.id} ({user.phone_number})")
-    return user
 
 
 class GroupChatConsumer(AsyncJsonWebsocketConsumer):
@@ -25,58 +15,32 @@ class GroupChatConsumer(AsyncJsonWebsocketConsumer):
         print("🚀 NEW GROUP WEBSOCKET CONNECTION ATTEMPT")
         print("="*50)
         
-        print("📍 URL Path:", self.scope.get("path"))
-        print("📍 Query String:", self.scope.get("query_string"))
-
-        # Extract token - simplified like the 2-person chat
+        # Extract token quickly
         token = self.scope["query_string"].decode()
-        print("🔍 Raw token string:", token)
-
         token = dict(q.split("=") for q in token.split("&") if "=" in q).get("token")
-        print("🔍 Parsed token:", token[:50] + "..." if token and len(token) > 50 else token)
 
-        # Authenticate user
-        self.user = await self._get_user_from_token(token)
-        print(f"👤 Authenticated user: {self.user}")
-
-        if not self.user:
-            print("❌ Authentication failed - closing connection")
-            await self.close(code=4001)
-            return
-
-        # Get group ID
+        # Get group ID early
         try:
-            self.group_id = self.scope["url_route"]["kwargs"]["group_id"]
-            print(f"🏠 Group ID from URL: {self.group_id}")
-        except KeyError as e:
-            print(f"❌ Missing group_id in URL: {e}")
+            self.group_id = int(self.scope["url_route"]["kwargs"]["group_id"])
+        except (KeyError, ValueError):
             await self.close(code=4002)
             return
 
-        # Get and validate group
-        self.group = await self._get_group(self.user, int(self.group_id))
-        print(f"🏠 Group object: {self.group}")
-
-        if not self.group:
-            print("❌ Group not found or user not authorized")
-            await self.close(code=4003)
+        # Authenticate user and validate group/membership in one go
+        auth_result = await self._authenticate_and_validate(token, self.group_id)
+        
+        if not auth_result:
+            await self.close(code=4001)
             return
+            
+        self.user, self.group = auth_result
 
-        # Verify user is a member
-        if not await self._is_group_member(self.user, self.group):
-            print(f"❌ User {self.user.id} not a member of group {self.group.id}")
-            await self.close(code=4004)
-            return
-
-        # Join room
+        # Join room and accept connection
         self.room_group_name = f"group_chat_{self.group.id}"
-        print(f"🏠 Joining group room: {self.room_group_name}")
-
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
         
-        print("✅ Group WebSocket connection accepted!")
-        print(f"🔗 User {self.user.id} connected to group {self.group_id}")
+        print(f"✅ User {self.user.id} connected to group {self.group_id}")
         print("="*50 + "\n")
 
     async def disconnect(self, close_code):
@@ -144,9 +108,11 @@ class GroupChatConsumer(AsyncJsonWebsocketConsumer):
         
         try:
             # Authenticate user
+            print("🔑 Validating token...")
             jwt_auth = JWTAuthentication()
             validated_token = jwt_auth.get_validated_token(token)
             user = jwt_auth.get_user(validated_token)
+            print(f"✅ Token valid for user: {user.id}")
             
             # Get group and check membership in single query using select_related
             group = Group.objects.select_related().prefetch_related('members').get(
