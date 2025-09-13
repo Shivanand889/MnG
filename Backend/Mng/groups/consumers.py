@@ -137,54 +137,42 @@ class GroupChatConsumer(AsyncJsonWebsocketConsumer):
 
     # ---------- Database operations ----------
     @database_sync_to_async
-    def _get_user_from_token(self, token):
+    def _authenticate_and_validate(self, token, group_id):
+        """Single database query to authenticate user and validate group membership"""
         if not token:
             return None
+        
         try:
-            user = get_user_from_token(token)
-            print(f"🔍 Database lookup successful: User {user.id}")
-            return user
-        except Exception as e:
-            print(f"❌ Token validation error: {e}")
+            # Authenticate user
+            jwt_auth = JWTAuthentication()
+            validated_token = jwt_auth.get_validated_token(token)
+            user = jwt_auth.get_user(validated_token)
+            
+            # Get group and check membership in single query using select_related
+            group = Group.objects.select_related().prefetch_related('members').get(
+                pk=group_id, 
+                is_active=True,
+                members__user=user  # This ensures user is a member
+            )
+            
+            print(f"✅ Authenticated user {user.id} for group {group.name}")
+            return (user, group)
+            
+        except (Group.DoesNotExist, Exception) as e:
+            print(f"❌ Authentication/validation failed: {e}")
             return None
-
-    @database_sync_to_async
-    def _get_group(self, user, group_id):
-        try:
-            group = Group.objects.get(pk=group_id, is_active=True)
-            print(f"🔍 Group found: ID={group.id}, name={group.name}")
-            return group
-        except Group.DoesNotExist:
-            print(f"❌ Group {group_id} not found in database")
-            return None
-
-    @database_sync_to_async
-    def _is_group_member(self, user, group):
-        try:
-            is_member = GroupMember.objects.filter(group=group, user=user).exists()
-            print(f"✅ Membership check: User {user.id} in group {group.id} = {is_member}")
-            return is_member
-        except Exception as e:
-            print(f"❌ Error checking membership: {e}")
-            return False
 
     @database_sync_to_async
     def _create_group_message(self, group_id, sender_id, text):
-        print(f"💾 Creating group message in database:")
-        print(f"   Group ID: {group_id}")
-        print(f"   Sender ID: {sender_id}")
-        print(f"   Text: '{text}'")
-        
         try:
-            # Get group and sender
+            # Use get_or_create or direct creation with minimal queries
             group = Group.objects.get(pk=group_id)
-            sender = Users.objects.get(pk=sender_id)
+            sender = Users.objects.select_related('profile').prefetch_related('photos').get(pk=sender_id)
             
             # Create message
             message = GroupMessage.objects.create(group=group, sender=sender, text=text)
-            print(f"✅ Group message created with ID: {message.id}")
             
-            # Get sender details
+            # Get sender details efficiently
             photo = None
             if hasattr(sender, "photos") and sender.photos.exists():
                 first_photo = sender.photos.filter(is_private=False).first()
